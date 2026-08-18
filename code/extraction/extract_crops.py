@@ -129,7 +129,7 @@ if __name__ == '__main__':
         'ndwi',
         'mtci',
         'swir_long',
-        'class'
+        'classes'
     ]
     df = pd.DataFrame(
         dataset,
