@@ -7,10 +7,9 @@ from scipy.ndimage import binary_erosion
 
 def sample_pixels(
     mask: np.ndarray,
-    features: list[np.ndarray],
     sample_size: int,
     buffer_pixels: int = 3
-) -> list[list[float]]:
+) -> np.ndarray:
     mask = binary_erosion(
         mask,
         iterations=buffer_pixels
@@ -24,6 +23,12 @@ def sample_pixels(
             replace=False
         )]
 
+    return idx
+
+def extract_features(
+    idx: np.ndarray,
+    features: list[np.ndarray]
+) -> list[list[float]]:
     rows = []
 
     for r, c in idx:
@@ -39,17 +44,8 @@ def sample_pixels(
 
     return rows
 
-if __name__ == '__main__':
-    label_file = '../rasterized/2018.tif'
-    sentinel_file = '../raw/47PQQ_2018-10-31.tif'
-    label = rasterio.open(label_file)
+def process_sentinel(sentinel_file: str) -> list[np.ndarray]:
     tile = rasterio.open(sentinel_file)
-    tile_id = os.path.basename(sentinel_file).split('_')[0]
-    aligned_overlap = label_extractor(
-        label,
-        tile,
-        tile_id
-    )
     blue = tile.read(1).astype('float32')
     green = tile.read(2).astype('float32')
     red = tile.read(3).astype('float32')
@@ -62,13 +58,31 @@ if __name__ == '__main__':
     evi = 2.5 * ((nir - red) / (nir + 6 * red - 7.5 * blue + 1))
     ndwi = (green - swir) / (green + swir)
     mtci = (re_mid - re_early) / (re_early - red)
-    features = [
+
+    return [
         ndvi,
         evi,
         ndwi,
         mtci,
         swir_long
     ]
+
+if __name__ == '__main__':
+    label_file = '../rasterized/2018.tif'
+    oct_file = '../raw/47PQQ_2018-10-31.tif'
+    nov_file = '../raw/47PQQ_2018-11-30.tif'
+    dec_file = '../raw/47PQQ_2018-12-31.tif'
+    label = rasterio.open(label_file)
+    oct = rasterio.open(oct_file)
+    tile_id = os.path.basename(oct_file).split('_')[0]
+    aligned_overlap = label_extractor(
+        label,
+        oct,
+        tile_id
+    )
+    oct_features = process_sentinel(oct_file)
+    nov_features = process_sentinel(nov_file)
+    dec_features = process_sentinel(dec_file)
     samples_per_class = 200000
     dataset = []
     class_map = {
@@ -84,52 +98,67 @@ if __name__ == '__main__':
         2413: 'longan',
         2416: 'jackfruit',
         2419: 'mangosteen',
-        2420: 'longkong'
+        2420: 'longkong',
+        9999: 'others'
     }
-    others = 9999
 
     for class_id in class_map:
-        mask = aligned_overlap == class_id
-        rows = sample_pixels(
+        known_mask = np.isin(
+            aligned_overlap,
+            list(class_map.keys())
+        )
+        water_mask = np.char.startswith(
+            aligned_overlap.astype(str),
+            '4'
+        )
+        building_mask = np.char.startswith(
+            aligned_overlap.astype(str),
+            '1'
+        )
+        mask = ~(known_mask | water_mask | building_mask) if class_id == 9999 else aligned_overlap == class_id
+        idx = sample_pixels(
             mask,
-            features,
             samples_per_class
         )
+        oct_rows = extract_features(
+            idx,
+            oct_features
+        )
+        nov_rows = extract_features(
+            idx,
+            nov_features
+        )
+        dec_rows = extract_features(
+            idx,
+            dec_features
+        )
 
-        for row in rows:
+        for oct_row, nov_row, dec_row in zip(
+            oct_rows,
+            nov_rows,
+            dec_rows
+        ):
+            row = oct_row + nov_row + dec_row
             row.append(class_id)
             dataset.append(row)
 
-    known_mask = np.isin(
-        aligned_overlap,
-        list(class_map.keys())
-    )
-    water_mask = np.char.startswith(
-        aligned_overlap.astype(str),
-        '4'
-    )
-    building_mask = np.char.startswith(
-        aligned_overlap.astype(str),
-        '1'
-    )
-    others_mask = ~(known_mask | water_mask | building_mask)
-    rows = sample_pixels(
-        others_mask,
-        features,
-        samples_per_class
-    )
-
-    for row in rows:
-        row.append(others)
-        dataset.append(row)
-
     columns = [
-        'ndvi',
-        'evi',
-        'ndwi',
-        'mtci',
-        'swir_long',
-        'classes'
+        'ndvi_oct',
+        'evi_oct',
+        'ndwi_oct',
+        'mtci_oct',
+        'swir_long_oct',
+        'ndvi_nov',
+        'evi_nov',
+        'ndwi_nov',
+        'mtci_nov',
+        'swir_long_nov',
+        'ndvi_dec',
+        'evi_dec',
+        'ndwi_dec',
+        'mtci_dec',
+        'swir_long_dec',
+        'class'
     ]
     df = pd.DataFrame(
         dataset,
