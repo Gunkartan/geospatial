@@ -131,7 +131,7 @@ if __name__ == '__main__':
     columns = ['labels']
 
     for name in index_dict.keys():
-        columns.extend([name, f'{name} mean', f'{name} variance'])
+        columns.extend([name, f'{name}_mean', f'{name}_variance'])
 
     columns.append('building')
 
