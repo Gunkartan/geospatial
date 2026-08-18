@@ -55,7 +55,10 @@ def label_extractor(
         row_end = row_start + overlap_data.shape[0]
         col_start = int(raster_window.col_off)
         col_end = col_start + overlap_data.shape[1]
-        aligned_overlap[row_start:row_end, col_start:col_end] = overlap_data
+        aligned_overlap[
+            row_start:row_end,
+            col_start:col_end
+        ] = overlap_data
         profile = tile_raster.profile
         profile.update({
             'driver': 'GTiff',
