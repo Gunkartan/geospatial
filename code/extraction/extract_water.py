@@ -61,20 +61,20 @@ def create_csv(
 
     if first_write:
         df.to_csv(
-            'raw.csv',
+            '../datasets/raw_water.csv',
             index=False
         )
 
     else:
         df.to_csv(
-            'raw.csv',
+            '../datasets/raw_water.csv',
             mode='a',
             header=False,
             index=False
         )
 
 if __name__ == '__main__':
-    label_file = '../../rasterized/2018.tif'
+    label_file = '../rasterized/2018.tif'
     sentinel_file = '../raw/47PQQ_2018-10-31.tif'
     label = rasterio.open(label_file)
     tile = rasterio.open(sentinel_file)
