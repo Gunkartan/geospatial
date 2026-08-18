@@ -63,14 +63,14 @@ if __name__ == '__main__':
         y_cv,
         y_cv_pred,
         average='weighted'
-    )}')
+    ):.3f}')
     print(f'The recall is {recall_score(
         y_cv,
         y_cv_pred,
         average='weighted'
-    )}')
+    ):.3f}')
     print(f'The F1 score is {f1_score(
         y_cv,
         y_cv_pred,
         average='weighted'
-    )}')
+    ):.3f}')

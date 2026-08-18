@@ -101,21 +101,13 @@ if __name__ == '__main__':
         2420: 'longkong',
         9999: 'others'
     }
+    known_mask = np.isin(
+        aligned_overlap,
+        list(class_map.keys())
+    )
 
     for class_id in class_map:
-        known_mask = np.isin(
-            aligned_overlap,
-            list(class_map.keys())
-        )
-        water_mask = np.char.startswith(
-            aligned_overlap.astype(str),
-            '4'
-        )
-        building_mask = np.char.startswith(
-            aligned_overlap.astype(str),
-            '1'
-        )
-        mask = ~(known_mask | water_mask | building_mask) if class_id == 9999 else aligned_overlap == class_id
+        mask = ~known_mask if class_id == 9999 else aligned_overlap == class_id
         idx = sample_pixels(
             mask,
             samples_per_class
