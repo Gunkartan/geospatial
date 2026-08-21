@@ -1,5 +1,7 @@
 .vscode/
 __pycache__/
 datasets/
+label_encoders/
+models/
 rasterized/
 raw/

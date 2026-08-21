@@ -1,3 +1,5 @@
+import os
+import joblib
 import pandas as pd
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
@@ -10,6 +12,18 @@ if __name__ == '__main__':
     y = df['class']
     le = LabelEncoder()
     y_encoded = le.fit_transform(y)
+    os.makedirs(
+        '../models',
+        exist_ok=True
+    )
+    os.makedirs(
+        '../label_encoders',
+        exist_ok=True
+    )
+    joblib.dump(
+        le,
+        '../label_encoders/crop_label_encoder.joblib'
+    )
     x_train, x_temp, y_train, y_temp = train_test_split(
         x,
         y_encoded,
@@ -37,6 +51,7 @@ if __name__ == '__main__':
         x_train,
         y_train
     )
+    model.save_model('../models/crops.json')
     y_cv_pred = model.predict(x_cv)
     class_names = [
         'rice',

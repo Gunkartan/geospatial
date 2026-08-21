@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 import xgboost as xgb
@@ -5,6 +6,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score, recall_score, f1_score
 
 if __name__ == '__main__':
+    os.makedirs(
+        '../models',
+        exist_ok=True
+    )
     df = pd.read_csv('../datasets/preprocessed_water.csv')
     x = df.drop(columns=[
         'labels',
@@ -39,6 +44,7 @@ if __name__ == '__main__':
         x_train,
         y_train
     )
+    model.save_model('../models/water.json')
     y_cv_prob = model.predict_proba(x_cv)[
         :,
         1
