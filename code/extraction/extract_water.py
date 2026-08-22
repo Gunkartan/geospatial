@@ -8,7 +8,10 @@ from scipy.ndimage import uniform_filter
 def compute_neighborhood_features(
     arr: np.ndarray,
     size: int
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[
+    np.ndarray,
+    np.ndarray
+]:
     mean = uniform_filter(
         arr,
         size=size,
@@ -48,48 +51,18 @@ def extract_raw_vals(
 
     return features
 
-def create_csv(
-    features: np.ndarray,
-    cols: list[str],
-    first_write: bool
-) -> None:
-    df = pd.DataFrame(
-        features,
-        columns=cols
-    )
-    df = df.round(3)
+def process_water_features(sentinel_file: str) -> dict[
+    str,
+    np.ndarray
+]:
+    with rasterio.open(sentinel_file) as tile:
+        blue = tile.read(1).astype('float32')
+        green = tile.read(2).astype('float32')
+        red = tile.read(3).astype('float32')
+        nir = tile.read(7).astype('float32')
+        swir = tile.read(8).astype('float32')
+        swir_long = tile.read(9).astype('float32')
 
-    if first_write:
-        df.to_csv(
-            '../datasets/raw_water.csv',
-            index=False
-        )
-
-    else:
-        df.to_csv(
-            '../datasets/raw_water.csv',
-            mode='a',
-            header=False,
-            index=False
-        )
-
-if __name__ == '__main__':
-    label_file = '../rasterized/2018.tif'
-    sentinel_file = '../raw/47PQQ_2018-10-31.tif'
-    label = rasterio.open(label_file)
-    tile = rasterio.open(sentinel_file)
-    tile_id = os.path.basename(sentinel_file).split('_')[0]
-    aligned_overlap = label_extractor(
-        label,
-        tile,
-        tile_id
-    )
-    blue = tile.read(1).astype('float32')
-    green = tile.read(2).astype('float32')
-    red = tile.read(3).astype('float32')
-    nir = tile.read(7).astype('float32')
-    swir = tile.read(8).astype('float32')
-    swir_long = tile.read(9).astype('float32')
     ndvi = (nir - red) / (nir + red)
     ndwi = (green - nir) / (green + nir)
     evi = 2.5 * ((nir - red) / (nir + 6 * red - 7.5 * blue + 1))
@@ -126,6 +99,56 @@ if __name__ == '__main__':
         'snr': snr,
         'bri': bri
     }
+    features = {}
+
+    for name, arr in index_dict.items():
+        mean, variance = compute_neighborhood_features(
+            arr,
+            3
+        )
+        features[name] = arr
+        features[f'{name}_mean'] = mean
+        features[f'{name}_variance'] = variance
+
+    return features
+
+def create_csv(
+    features: np.ndarray,
+    cols: list[str],
+    first_write: bool
+) -> None:
+    df = pd.DataFrame(
+        features,
+        columns=cols
+    )
+    df = df.round(3)
+
+    if first_write:
+        df.to_csv(
+            '../datasets/raw_water.csv',
+            index=False
+        )
+
+    else:
+        df.to_csv(
+            '../datasets/raw_water.csv',
+            mode='a',
+            header=False,
+            index=False
+        )
+
+if __name__ == '__main__':
+    label_file = '../rasterized/2018.tif'
+    sentinel_file = '../raw/47PQQ_2018-10-31.tif'
+    label = rasterio.open(label_file)
+    tile = rasterio.open(sentinel_file)
+    tile_id = os.path.basename(sentinel_file).split('_')[0]
+    aligned_overlap = label_extractor(
+        label,
+        tile,
+        tile_id
+    )
+    index_dict = process_water_features(sentinel_file)
     block_size = 1024
     num_rows, num_cols = aligned_overlap.shape
     columns = ['labels']
