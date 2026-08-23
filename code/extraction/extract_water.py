@@ -38,7 +38,7 @@ def extract_raw_vals(
     labels = np.array([1 if str(val).startswith('4') else 0 for val in raw_vals])
     features = [raw_vals]
 
-    for _, arr in index_dict.items():
+    for arr in index_dict.values():
         features.append(arr[mask])
         mean, var = compute_neighborhood_features(
             arr,
@@ -47,9 +47,7 @@ def extract_raw_vals(
         features.append(mean[mask])
         features.append(var[mask])
 
-    features = np.column_stack(features + [labels])
-
-    return features
+    return np.column_stack(features + [labels])
 
 def process_water_features(sentinel_file: str) -> dict[
     str,
@@ -81,7 +79,8 @@ def process_water_features(sentinel_file: str) -> dict[
     rgri = red / green
     snr = swir / nir
     bri = (red + green) / (nir + swir)
-    index_dict = {
+
+    return {
         'ndvi': ndvi,
         'ndwi': ndwi,
         'evi': evi,
@@ -99,18 +98,6 @@ def process_water_features(sentinel_file: str) -> dict[
         'snr': snr,
         'bri': bri
     }
-    features = {}
-
-    for name, arr in index_dict.items():
-        mean, variance = compute_neighborhood_features(
-            arr,
-            3
-        )
-        features[name] = arr
-        features[f'{name}_mean'] = mean
-        features[f'{name}_variance'] = variance
-
-    return features
 
 def create_csv(
     features: np.ndarray,
@@ -154,8 +141,12 @@ if __name__ == '__main__':
     columns = ['labels']
 
     for name in index_dict.keys():
-        columns.extend([name, f'{name}_mean', f'{name}_variance'])
-
+        columns.extend([
+            name,
+            f'{name}_mean',
+            f'{name}_variance'
+        ])
+        
     columns.append('water')
 
     for row_start in range(
