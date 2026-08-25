@@ -2,6 +2,7 @@ import sys
 import joblib
 import pandas as pd
 import xgboost as xgb
+from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 
 def inference(year: int) -> None:
     df = pd.read_csv(f'../datasets/preprocessed_all_{year}.csv')
@@ -80,21 +81,99 @@ def inference(year: int) -> None:
         'mtci_dec',
         'swir_long_dec'
     ]
+    crop_classes = {
+        2101,
+        2204,
+        2205,
+        2302,
+        2303,
+        2403,
+        2404,
+        2405,
+        2407,
+        2413,
+        2416,
+        2419,
+        2420
+    }
+    class_names = [
+        'rice',
+        'cassava',
+        'pineapple',
+        'rubber',
+        'oil_palm',
+        'durian',
+        'rambutan',
+        'coconut',
+        'mango',
+        'longan',
+        'jackfruit',
+        'mangosteen',
+        'longkong',
+        'others'
+    ]
     water_df = df[water_features]
     water_probability = water_model.predict_proba(water_df)[
         :,
         1
     ]
+    water_prediction = (water_probability >= 0.56).astype(int)
+    water_true = df['class'].astype('str').str.startswith('4').astype(int)
+    p_water = precision_score(
+        water_true,
+        water_prediction
+    )
+    r_water = recall_score(
+        water_true,
+        water_prediction
+    )
+    f1_water = f1_score(
+        water_true,
+        water_prediction
+    )
+    print('Water model')
+    print(f'The precision is {p_water:.3f}')
+    print(f'The recall is {r_water:.3f}')
+    print(f'The F1 score is {f1_water:.3f}')
     df = df[water_probability < 0.56].copy()
     building_df = df[building_features]
     building_probability = building_model.predict_proba(building_df)[
         :,
         1
     ]
+    building_prediction = (building_probability >= 0.56).astype(int)
+    building_true = df['class'].astype(str).str.startswith('1').astype(int)
+    p_building = precision_score(
+        building_true,
+        building_prediction
+    )
+    r_building = recall_score(
+        building_true,
+        building_prediction
+    )
+    f1_building = f1_score(
+        building_true,
+        building_prediction
+    )
+    print('Building model')
+    print(f'The precision is {p_building:.3f}')
+    print(f'The recall is {r_building:.3f}')
+    print(f'The F1 score is {f1_building:.3f}')
     df = df[building_probability < 0.56].copy()
     crop_df = df[crop_features]
     crop_prediction = crop_model.predict(crop_df)
-    df['class'] = crop_label_encoder.inverse_transform(crop_prediction)
+    crop_prediction = crop_label_encoder.inverse_transform(crop_prediction)
+    crop_true = df['class'].where(
+        df['class'].isin(crop_classes),
+        9999
+    )
+    print('Crop model')
+    print(classification_report(
+        crop_true,
+        crop_prediction,
+        target_names=class_names
+    ))
+    df['class'] = crop_prediction
     df.to_csv(
         f'../datasets/final_classification_{year}.csv',
         index=False
