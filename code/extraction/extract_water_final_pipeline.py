@@ -15,8 +15,11 @@ def create_csv(
     year: int,
     first_write: bool
 ) -> None:
-    df = pd.DataFrame(features)
-    df = df[columns]
+    df = pd.DataFrame(
+        features,
+        columns=columns
+    )
+    df = df.round(3)
 
     if first_write:
         df.to_csv(
@@ -61,6 +64,7 @@ def extract_water(year: int) -> None:
         'row',
         'col'
     ] + water_feature_names
+    first_write = True
 
     for row_start in range(
         0,
@@ -123,8 +127,9 @@ def extract_water(year: int) -> None:
                 data,
                 columns,
                 year,
-                row_start == 0 and col_start == 0
+                first_write
             )
+            first_write = False
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
