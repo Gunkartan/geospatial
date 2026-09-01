@@ -62,7 +62,8 @@ def extract_water(year: int) -> None:
 
     columns = [
         'row',
-        'col'
+        'col',
+        'class'
     ] + water_feature_names
     first_write = True
 
@@ -98,7 +99,11 @@ def extract_water(year: int) -> None:
             cols = local_cols + col_start
             data = {
                 'row': rows,
-                'col': cols
+                'col': cols,
+                'class': label_block[
+                    local_rows,
+                    local_cols
+                ]
             }
 
             for name, arr in water_features.items():
