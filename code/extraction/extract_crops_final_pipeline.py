@@ -143,7 +143,6 @@ def extract_crops(year: int) -> None:
         dataset,
         columns=columns
     )
-    df = df.round(3)
     df.to_csv(
         f'../datasets/raw_crops_final_pipeline_{year}.csv',
         index=False
