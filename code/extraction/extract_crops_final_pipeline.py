@@ -61,14 +61,10 @@ def extract_crops(year: int) -> None:
         2413: 'longan',
         2416: 'jackfruit',
         2419: 'mangosteen',
-        2420: 'longkong',
-        9999: 'others'
+        2420: 'longkong'
     }
-    known_mask = np.isin(
-        aligned_overlap,
-        list(class_map.keys())
-    )
-    rows, cols = np.where(known_mask)
+    valid_mask = aligned_overlap != 0
+    rows, cols = np.where(valid_mask)
     keep = np.array([(
         row,
         col
