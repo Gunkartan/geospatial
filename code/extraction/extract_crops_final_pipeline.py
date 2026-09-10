@@ -143,6 +143,22 @@ def extract_crops(year: int) -> None:
         dataset,
         columns=columns
     )
+    samples_per_class = 200000
+    sampled_datasets = []
+
+    for class_id, group in df.groupby('class'):
+        if len(group) > samples_per_class:
+            group = group.sample(
+                n=samples_per_class,
+                random_state=42
+            )
+
+        sampled_datasets.append(group)
+
+    df = pd.concat(
+        sampled_datasets,
+        ignore_index=True
+    )
     df.to_csv(
         f'../datasets/raw_crops_final_pipeline_{year}.csv',
         index=False
