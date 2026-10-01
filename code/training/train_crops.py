@@ -8,7 +8,11 @@ from sklearn.preprocessing import LabelEncoder
 
 if __name__ == '__main__':
     df = pd.read_csv(f'../datasets/preprocessed_crops_standalone_2018.csv')
-    x = df.drop(columns=['class'])
+    x = df.drop(columns=[
+        'row',
+        'col',
+        'class'
+    ])
     y = df['class']
     le = LabelEncoder()
     y_encoded = le.fit_transform(y)
