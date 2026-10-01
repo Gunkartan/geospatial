@@ -7,7 +7,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score, classificat
 from sklearn.preprocessing import LabelEncoder
 
 if __name__ == '__main__':
-    df = pd.read_csv('../datasets/preprocessed_crops.csv')
+    df = pd.read_csv(f'../datasets/preprocessed_crops_standalone_2018.csv')
     x = df.drop(columns=['class'])
     y = df['class']
     le = LabelEncoder()
