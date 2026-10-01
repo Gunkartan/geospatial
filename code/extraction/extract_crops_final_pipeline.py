@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from utils.label_extractor import label_extractor
 from extraction.extract_crops import process_sentinel
+from scipy.ndimage import binary_erosion
 
 def extract_crops(year: int) -> None:
     label_file = f'../rasterized/{year}.tif'
@@ -63,61 +64,68 @@ def extract_crops(year: int) -> None:
         2419: 'mangosteen',
         2420: 'longkong'
     }
-    valid_mask = aligned_overlap != 0
-    rows, cols = np.where(valid_mask)
-    keep = np.array([(
-        row,
-        col
-    ) not in water_set and (
-        row,
-        col
-    ) not in building_set for row, col in zip(
-        rows,
-        cols
-    )])
-    rows = rows[keep]
-    cols = cols[keep]
     dataset = []
+    buffer_pixels = 3
 
-    for row, col in zip(
-        rows,
-        cols
-    ):
-        label = aligned_overlap[
-            row,
-            col
-        ]
-
-        if label in class_map:
-            class_id = label
+    for class_id in [
+        *class_map.keys(),
+        9999
+    ]:
+        if class_id == 9999:
+            mask = (aligned_overlap != 0) & ~np.isin(
+                aligned_overlap,
+                list(class_map.keys())
+            )
 
         else:
-            class_id = 9999
+            mask = aligned_overlap == class_id
 
-        data = {
-            'row': row,
-            'col': col
-        }
+        mask = binary_erosion(
+            mask,
+            iterations=buffer_pixels
+        )
+        rows, cols = np.where(mask)
+        keep = np.array([(
+            row,
+            col
+        ) not in water_set and (
+            row,
+            col
+        ) not in building_set for row, col in zip(
+            rows,
+            cols
+        )])
+        rows = rows[keep]
+        cols = cols[keep]
 
-        for month, features in zip(
-            [
-                'oct',
-                'nov',
-                'dec'
-            ],
-            feature_sets
+        for row, col in zip(
+            rows,
+            cols
         ):
-            for name, feature in zip(
-                feature_names,
-                features
-            ):
-                data[f'{name}_{month}'] = feature[
-                    row,
-                    col
-                ]
+            data = {
+                'row': row,
+                'col': col
+            }
 
-        data['class'] = class_id
-        dataset.append(data)
+            for month, features in zip(
+                [
+                    'oct',
+                    'nov',
+                    'dec'
+                ],
+                feature_sets
+            ):
+                for name, feature in zip(
+                    feature_names,
+                    features
+                ):
+                    data[f'{name}_{month}'] = feature[
+                        row,
+                        col
+                    ]
+
+            data['class'] = class_id
+            dataset.append(data)
 
     columns = [
         'row',
