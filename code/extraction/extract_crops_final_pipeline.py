@@ -7,23 +7,29 @@ from utils.label_extractor import label_extractor
 from extraction.extract_crops import process_sentinel
 from scipy.ndimage import binary_erosion
 
-def extract_crops(year: int) -> None:
+def extract_crops(
+    year: int,
+    remove_water_buildings: bool
+) -> None:
+    output_name = f'raw_crops_final_pipeline_{year}' if remove_water_buildings else f'raw_crops_standalone_{year}'
     label_file = f'../rasterized/{year}.tif'
     oct_file = f'../raw/47PQQ_{year}-10-31.tif'
     nov_file = f'../raw/47PQQ_{year}-11-30.tif'
     dec_file = f'../raw/47PQQ_{year}-12-31.tif'
     water_indices_file = f'../datasets/water_indices_{year}.csv'
     building_indices_file = f'../datasets/building_indices_{year}.csv'
-    water_indices = pd.read_csv(water_indices_file)
-    building_indices = pd.read_csv(building_indices_file)
-    water_set = set(zip(
-        water_indices['row'],
-        water_indices['col']
-    ))
-    building_set = set(zip(
-        building_indices['row'],
-        building_indices['col']
-    ))
+
+    if remove_water_buildings:
+        water_indices = pd.read_csv(water_indices_file)
+        building_indices = pd.read_csv(building_indices_file)
+        water_set = set(zip(
+            water_indices['row'],
+            water_indices['col']
+        ))
+        building_set = set(zip(
+            building_indices['row'],
+            building_indices['col']
+        ))
 
     with rasterio.open(label_file) as label:
         with rasterio.open(oct_file) as tile:
@@ -65,7 +71,6 @@ def extract_crops(year: int) -> None:
         2420: 'longkong'
     }
     dataset = []
-    buffer_pixels = 3
 
     for class_id in [
         *class_map.keys(),
@@ -82,21 +87,23 @@ def extract_crops(year: int) -> None:
 
         mask = binary_erosion(
             mask,
-            iterations=buffer_pixels
+            iterations=3
         )
         rows, cols = np.where(mask)
-        keep = np.array([(
-            row,
-            col
-        ) not in water_set and (
-            row,
-            col
-        ) not in building_set for row, col in zip(
-            rows,
-            cols
-        )])
-        rows = rows[keep]
-        cols = cols[keep]
+
+        if remove_water_buildings:
+            keep = np.array([(
+                row,
+                col
+            ) not in water_set and (
+                row,
+                col
+            ) not in building_set for row, col in zip(
+                rows,
+                cols
+            )])
+            rows = rows[keep]
+            cols = cols[keep]
 
         for row, col in zip(
             rows,
@@ -168,13 +175,17 @@ def extract_crops(year: int) -> None:
         ignore_index=True
     )
     df.to_csv(
-        f'../datasets/raw_crops_final_pipeline_{year}.csv',
+        f'../datasets/{output_name}.csv',
         index=False
     )
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        raise ValueError('Please provide a year')
+    if len(sys.argv) != 3:
+        raise ValueError('Please provide values for all the required arguments')
 
     year = int(sys.argv[1])
-    extract_crops(year)
+    remove_water_buildings = sys.argv[2].lower() == 'true'
+    extract_crops(
+        year=year,
+        remove_water_buildings=remove_water_buildings
+    )
