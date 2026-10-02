@@ -4,8 +4,13 @@ import pandas as pd
 import xgboost as xgb
 from sklearn.metrics import classification_report
 
-def infer_crops(year: int) -> None:
-    df = pd.read_csv(f'../datasets/preprocessed_crops_final_pipeline_{year}.csv')
+def infer_crops(
+    year: int,
+    standalone: bool
+) -> None:
+    filename = f'preprocessed_crops_standalone_{year}' if standalone else f'preprocessed_crops_final_pipeline_{year}'
+    output_name = f'final_classification_standalone_{year}' if standalone else f'final_classification_pipeline_{year}'
+    df = pd.read_csv(f'../datasets/{filename}.csv')
     crop_model = xgb.XGBClassifier()
     crop_model.load_model('../models/crops.json')
     crop_label_encoder = joblib.load('../label_encoders/crop_label_encoder.joblib')
@@ -73,13 +78,17 @@ def infer_crops(year: int) -> None:
     ))
     df['class'] = crop_prediction
     df.to_csv(
-        f'../datasets/final_classification_{year}.csv',
+        f'../datasets/{output_name}.csv',
         index=False
     )
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        raise ValueError('Please provide a year')
+    if len(sys.argv) != 3:
+        raise ValueError('Please provide values for all the required arguments')
 
     year = int(sys.argv[1])
-    infer_crops(year)
+    standalone = sys.argv[2].lower() == 'true'
+    infer_crops(
+        year=year,
+        standalone=standalone
+    )
