@@ -9,7 +9,8 @@ from scipy.ndimage import binary_erosion
 
 def extract_crops(
     year: int,
-    remove_water_buildings: bool
+    remove_water_buildings: bool,
+    sampling: bool
 ) -> None:
     output_name = f'raw_crops_final_pipeline_{year}' if remove_water_buildings else f'raw_crops_standalone_{year}'
     label_file = f'../rasterized/{year}.tif'
@@ -158,34 +159,39 @@ def extract_crops(
         dataset,
         columns=columns
     )
-    samples_per_class = 200000
-    sampled_datasets = []
 
-    for class_id, group in df.groupby('class'):
-        if len(group) > samples_per_class:
-            group = group.sample(
-                n=samples_per_class,
-                random_state=42
-            )
+    if sampling:
+        samples_per_class = 200000
+        sampled_datasets = []
 
-        sampled_datasets.append(group)
+        for class_id, group in df.groupby('class'):
+            if len(group) > samples_per_class:
+                group = group.sample(
+                    n=samples_per_class,
+                    random_state=42
+                )
 
-    df = pd.concat(
-        sampled_datasets,
-        ignore_index=True
-    )
+            sampled_datasets.append(group)
+
+        df = pd.concat(
+            sampled_datasets,
+            ignore_index=True
+        )
+
     df.to_csv(
         f'../datasets/{output_name}.csv',
         index=False
     )
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         raise ValueError('Please provide values for all the required arguments')
 
     year = int(sys.argv[1])
     remove_water_buildings = sys.argv[2].lower() == 'true'
+    sampling = sys.argv[3].lower() == 'true'
     extract_crops(
         year=year,
-        remove_water_buildings=remove_water_buildings
+        remove_water_buildings=remove_water_buildings,
+        sampling=sampling
     )
