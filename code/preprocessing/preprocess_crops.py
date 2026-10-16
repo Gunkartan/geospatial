@@ -1,8 +1,9 @@
+import sys
 import numpy as np
 import pandas as pd
 
-if __name__ == '__main__':
-    df = pd.read_csv('../datasets/raw_crops.csv')
+def preprocess_crops(year: int) -> None:
+    df = pd.read_csv(f'../datasets/raw_crops_training_{year}.csv')
     df = df.replace(
         [
             np.inf,
@@ -12,6 +13,13 @@ if __name__ == '__main__':
     )
     df = df.dropna().reset_index(drop=True)
     df.to_csv(
-        '../datasets/preprocessed_crops.csv',
+        f'../datasets/preprocessed_crops_{year}.csv',
         index=False
     )
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        raise ValueError('Please provide values for all the required arguments')
+
+    year = int(sys.argv[1])
+    preprocess_crops(year=year)
