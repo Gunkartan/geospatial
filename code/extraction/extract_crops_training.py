@@ -140,7 +140,7 @@ def extract_crops(
         sampled_datasets = []
 
         for class_id, group in df.groupby('class'):
-            if class_id != 9999 and len(group) > samples_per_class:
+            if len(group) > samples_per_class:
                 group = group.sample(
                     n=samples_per_class,
                     random_state=42
