@@ -19,6 +19,7 @@ def extract_crops(
     dec_file = f'../raw/47PQQ_{year}-12-31.tif'
     water_indices_file = f'../datasets/water_indices_{year}.csv'
     building_indices_file = f'../datasets/building_indices_{year}.csv'
+    excluded_file = f'../datasets/raw_crops_excluded_{year}.csv'
 
     if remove_water_buildings:
         water_indices = pd.read_csv(water_indices_file)
@@ -72,6 +73,7 @@ def extract_crops(
         2420: 'longkong'
     }
     dataset = []
+    excluded_dataset = []
 
     for class_id in [
         *class_map.keys(),
@@ -103,6 +105,19 @@ def extract_crops(
                 rows,
                 cols
             )])
+            excluded_rows = rows[~keep]
+            excluded_cols = cols[~keep]
+
+            for row, col in zip(
+                excluded_rows,
+                excluded_cols
+            ):
+                excluded_dataset.append({
+                    'row': row,
+                    'col': col,
+                    'class': class_id
+                })
+
             rows = rows[keep]
             cols = cols[keep]
 
@@ -165,7 +180,7 @@ def extract_crops(
         sampled_datasets = []
 
         for class_id, group in df.groupby('class'):
-            if len(group) > samples_per_class:
+            if class_id != 9999 and len(group) > samples_per_class:
                 group = group.sample(
                     n=samples_per_class,
                     random_state=42
@@ -182,6 +197,20 @@ def extract_crops(
         f'../datasets/{output_name}.csv',
         index=False
     )
+
+    if remove_water_buildings:
+        excluded_df = pd.DataFrame(
+            excluded_dataset,
+            columns=[
+                'row',
+                'col',
+                'class'
+            ]
+        )
+        excluded_df.to_csv(
+            excluded_file,
+            index=False
+        )
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:

@@ -69,14 +69,40 @@ def infer_crops(
         df['class'].isin(crop_classes),
         9999
     )
+    evaluation_true = crop_true.tolist()
+    evaluation_prediction = crop_prediction.tolist()
+
+    if not standalone:
+        excluded_file = f'../datasets/raw_crops_excluded_{year}.csv'
+        excluded_df = pd.read_csv(excluded_file)
+        excluded_true = excluded_df['class'].where(
+            excluded_df['class'].isin(crop_classes),
+            9999
+        )
+        evaluation_true.extend(excluded_true.tolist())
+        evaluation_prediction.extend([9999] * len(excluded_df))
+
     print('Crop model')
     print(classification_report(
-        crop_true,
-        crop_prediction,
+        evaluation_true,
+        evaluation_prediction,
         labels=crop_classes,
-        target_names=target_names
+        target_names=target_names,
+        zero_division=0
     ))
     df['class'] = crop_prediction
+
+    if not standalone:
+        excluded_df['class'] = 9999
+        excluded_df = excluded_df.reindex(columns=df.columns)
+        df = pd.concat(
+            [
+                df,
+                excluded_df
+            ],
+            ignore_index=True
+        )
+        
     df.to_csv(
         f'../datasets/{output_name}.csv',
         index=False
