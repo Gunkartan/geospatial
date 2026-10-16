@@ -11,7 +11,7 @@ def extract_crops(
     year: int,
     sampling: bool
 ) -> None:
-    output_name = f'raw_crops_training_{year}.csv'
+    output_name = f'raw_crops_training_{year}'
     label_file = f'../rasterized/{year}.tif'
     oct_file = f'../raw/47PQQ_{year}-10-31.tif'
     nov_file = f'../raw/47PQQ_{year}-11-30.tif'
