@@ -1,5 +1,6 @@
 import os
 import joblib
+import numpy as np
 import pandas as pd
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
@@ -7,7 +8,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score, classificat
 from sklearn.preprocessing import LabelEncoder
 
 if __name__ == '__main__':
-    df = pd.read_csv(f'../datasets/preprocessed_crops_standalone_2018.csv')
+    df = pd.read_csv(f'../datasets/preprocessed_crops_2018.csv')
     x = df.drop(columns=[
         'row',
         'col',
@@ -57,26 +58,29 @@ if __name__ == '__main__':
     )
     model.save_model('../models/crops.json')
     y_cv_pred = model.predict(x_cv)
-    class_names = [
-        'rice',
-        'cassava',
-        'pineapple',
-        'rubber',
-        'oil_palm',
-        'durian',
-        'rambutan',
-        'coconut',
-        'mango',
-        'longan',
-        'jackfruit',
-        'mangosteen',
-        'longkong',
-        'others'
-    ]
+    class_map = {
+        2101: 'rice',
+        2204: 'cassava',
+        2205: 'pineapple',
+        2302: 'rubber',
+        2303: 'oil_palm',
+        2403: 'durian',
+        2404: 'rambutan',
+        2405: 'coconut',
+        2407: 'mango',
+        2413: 'longan',
+        2416: 'jackfruit',
+        2419: 'mangosteen',
+        2420: 'longkong',
+        9999: 'others'
+    }
+    class_names = [class_map[class_id] for class_id in le.classes_]
     print(classification_report(
         y_cv,
         y_cv_pred,
-        target_names=class_names
+        labels=np.arange(len(le.classes_)),
+        target_names=class_names,
+        zero_division=0
     ))
     print(f'The precision is {precision_score(
         y_cv,
