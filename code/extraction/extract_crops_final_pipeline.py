@@ -74,43 +74,49 @@ def extract_crops(
     }
     dataset = []
     excluded_dataset = []
+    other_class_ids = np.unique(aligned_overlap)
+    other_class_ids = [int(class_id) for class_id in other_class_ids if class_id != 0 and class_id not in class_map]
+    rng = np.random.default_rng(42)
 
     for class_id in [
         *class_map.keys(),
-        9999
+        *other_class_ids
     ]:
-        if class_id == 9999:
-            mask = (aligned_overlap != 0) & ~np.isin(
-                aligned_overlap,
-                list(class_map.keys())
-            )
-
-        else:
-            mask = aligned_overlap == class_id
-
+        sample_size = 200000 if class_id in class_map else 2000
+        mask = aligned_overlap == class_id
         mask = binary_erosion(
             mask,
             iterations=3
         )
         rows, cols = np.where(mask)
 
+        if sampling and len(rows) > sample_size:
+            selected = rng.choice(
+                len(rows),
+                size=sample_size,
+                replace=False
+            )
+            rows = rows[selected]
+            cols = cols[selected]
+
         if remove_water_buildings:
-            keep = np.array([(
-                row,
-                col
-            ) not in water_set and (
-                row,
-                col
-            ) not in building_set for row, col in zip(
-                rows,
-                cols
-            )])
-            excluded_rows = rows[~keep]
-            excluded_cols = cols[~keep]
+            keep = np.array(
+                [(
+                    row,
+                    col
+                ) not in water_set and (
+                    row,
+                    col
+                ) not in building_set for row, col in zip(
+                    rows,
+                    cols
+                )],
+                dtype=bool
+            )
 
             for row, col in zip(
-                excluded_rows,
-                excluded_cols
+                rows[~keep],
+                cols[~keep]
             ):
                 excluded_dataset.append({
                     'row': row,
@@ -147,7 +153,7 @@ def extract_crops(
                         col
                     ]
 
-            data['class'] = class_id
+            data['class'] = class_id if class_id in class_map else 9999
             dataset.append(data)
 
     columns = [
@@ -174,25 +180,6 @@ def extract_crops(
         dataset,
         columns=columns
     )
-
-    if sampling:
-        samples_per_class = 200000
-        sampled_datasets = []
-
-        for class_id, group in df.groupby('class'):
-            if class_id != 9999 and len(group) > samples_per_class:
-                group = group.sample(
-                    n=samples_per_class,
-                    random_state=42
-                )
-
-            sampled_datasets.append(group)
-
-        df = pd.concat(
-            sampled_datasets,
-            ignore_index=True
-        )
-
     df.to_csv(
         f'../datasets/{output_name}.csv',
         index=False
