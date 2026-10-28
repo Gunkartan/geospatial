@@ -79,15 +79,13 @@ def infer_buildings(year: int) -> None:
     print(f'The precision is {p_buildings:.3f}')
     print(f'The recall is {r_buildings:.3f}')
     print(f'The F1 score is {f1_buildings:.3f}')
-    building_indices = df.loc[
-        probability >= 0.56,
-        [
-            'row',
-            'col'
-        ]
-    ]
-    building_indices.to_csv(
-        f'../datasets/building_indices_{year}.csv',
+    building_probabilities = df[[
+        'row',
+        'col'
+    ]].copy()
+    building_probabilities['building_probability'] = probability
+    building_probabilities.to_csv(
+        f'../datasets/building_probabilities_{year}.csv',
         index=False
     )
 

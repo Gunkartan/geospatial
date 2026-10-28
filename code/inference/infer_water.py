@@ -79,15 +79,13 @@ def infer_water(year: int) -> None:
     print(f'The precision is {p_water:.3f}')
     print(f'The recall is {r_water:.3f}')
     print(f'The F1 score is {f1_water:.3f}')
-    water_indices = df.loc[
-        probability >= 0.56,
-        [
-            'row',
-            'col'
-        ]
-    ]
-    water_indices.to_csv(
-        f'../datasets/water_indices_{year}.csv',
+    water_probabilities = df[[
+        'row',
+        'col'
+    ]].copy()
+    water_probabilities['water_probability'] = probability
+    water_probabilities.to_csv(
+        f'../datasets/water_probabilities_{year}.csv',
         index=False
     )
 
