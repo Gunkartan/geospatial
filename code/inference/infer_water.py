@@ -7,6 +7,8 @@ def infer_water(year: int) -> None:
     df = pd.read_csv(f'../datasets/preprocessed_water_final_pipeline_{year}.csv')
     water_model = xgb.XGBClassifier()
     water_model.load_model('../models/water.json')
+    building_model = xgb.XGBClassifier()
+    building_model.load_model('../models/buildings.json')
     water_features = [
         'ndvi',
         'ndvi_mean',
@@ -57,11 +59,15 @@ def infer_water(year: int) -> None:
         'bri_mean',
         'bri_variance'
     ]
-    probability = water_model.predict_proba(df[water_features])[
+    water_probability = water_model.predict_proba(df[water_features])[
         :,
         1
     ]
-    water_prediction = (probability >= 0.56).astype(int)
+    building_probability = building_model.predict_proba(df[water_features])[
+        :,
+        1
+    ]
+    water_prediction = (water_probability >= 0.56).astype(int)
     water_true = df['class'].astype(str).str.startswith('4').astype(int)
     p_water = precision_score(
         water_true,
@@ -79,13 +85,14 @@ def infer_water(year: int) -> None:
     print(f'The precision is {p_water:.3f}')
     print(f'The recall is {r_water:.3f}')
     print(f'The F1 score is {f1_water:.3f}')
-    water_probabilities = df[[
+    probabilities = df[[
         'row',
         'col'
     ]].copy()
-    water_probabilities['water_probability'] = probability
-    water_probabilities.to_csv(
-        f'../datasets/water_probabilities_{year}.csv',
+    probabilities['water_probability'] = water_probability
+    probabilities['building_probability'] = building_probability
+    probabilities.to_csv(
+        f'../datasets/upstream_probabilities_{year}.csv',
         index=False
     )
 
