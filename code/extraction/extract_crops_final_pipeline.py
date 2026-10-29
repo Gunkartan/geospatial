@@ -17,21 +17,18 @@ def extract_crops(
     oct_file = f'../raw/47PQQ_{year}-10-31.tif'
     nov_file = f'../raw/47PQQ_{year}-11-30.tif'
     dec_file = f'../raw/47PQQ_{year}-12-31.tif'
-    water_indices_file = f'../datasets/water_indices_{year}.csv'
-    building_indices_file = f'../datasets/building_indices_{year}.csv'
-    excluded_file = f'../datasets/raw_crops_excluded_{year}.csv'
+    upstream_probability_file = f'../datasets/upstream_probabilities_{year}.csv'
 
     if remove_water_buildings:
-        water_indices = pd.read_csv(water_indices_file)
-        building_indices = pd.read_csv(building_indices_file)
-        water_set = set(zip(
-            water_indices['row'],
-            water_indices['col']
-        ))
-        building_set = set(zip(
-            building_indices['row'],
-            building_indices['col']
-        ))
+        upstream_probabilities = pd.read_csv(upstream_probability_file)
+        water_probability_map = upstream_probabilities.set_index([
+            'row',
+            'col'
+        ])['water_probability']
+        building_probability_map = upstream_probabilities.set_index([
+            'row',
+            'col'
+        ])['building_probability']
 
     with rasterio.open(label_file) as label:
         with rasterio.open(oct_file) as tile:
@@ -73,7 +70,6 @@ def extract_crops(
         2420: 'longkong'
     }
     dataset = []
-    excluded_dataset = []
     other_class_ids = np.unique(aligned_overlap)
     other_class_ids = [int(class_id) for class_id in other_class_ids if class_id != 0 and class_id not in class_map]
     rng = np.random.default_rng(42)
@@ -99,34 +95,6 @@ def extract_crops(
             rows = rows[selected]
             cols = cols[selected]
 
-        if remove_water_buildings:
-            keep = np.array(
-                [(
-                    row,
-                    col
-                ) not in water_set and (
-                    row,
-                    col
-                ) not in building_set for row, col in zip(
-                    rows,
-                    cols
-                )],
-                dtype=bool
-            )
-
-            for row, col in zip(
-                rows[~keep],
-                cols[~keep]
-            ):
-                excluded_dataset.append({
-                    'row': row,
-                    'col': col,
-                    'class': class_id
-                })
-
-            rows = rows[keep]
-            cols = cols[keep]
-
         for row, col in zip(
             rows,
             cols
@@ -135,6 +103,20 @@ def extract_crops(
                 'row': row,
                 'col': col
             }
+
+            if remove_water_buildings:
+                coordinate = (
+                    row,
+                    col
+                )
+                data['water_probability'] = water_probability_map.get(
+                    coordinate,
+                    np.nan
+                )
+                data['building_probability'] = building_probability_map.get(
+                    coordinate,
+                    np.nan
+                )
 
             for month, features in zip(
                 [
@@ -176,6 +158,13 @@ def extract_crops(
         'mtci_dec',
         'swir_long_dec'
     ]
+
+    if remove_water_buildings:
+        columns.extend([
+            'water_probability',
+            'building_probability'
+        ])
+
     df = pd.DataFrame(
         dataset,
         columns=columns
@@ -184,20 +173,6 @@ def extract_crops(
         f'../datasets/{output_name}.csv',
         index=False
     )
-
-    if remove_water_buildings:
-        excluded_df = pd.DataFrame(
-            excluded_dataset,
-            columns=[
-                'row',
-                'col',
-                'class'
-            ]
-        )
-        excluded_df.to_csv(
-            excluded_file,
-            index=False
-        )
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:
