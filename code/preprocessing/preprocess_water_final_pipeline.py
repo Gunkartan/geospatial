@@ -11,7 +11,6 @@ def preprocess_water(year: int) -> None:
         ],
         np.nan
     )
-    df = df.dropna().reset_index(drop=True)
     df.to_csv(
         f'../datasets/preprocessed_water_final_pipeline_{year}.csv',
         index=False
