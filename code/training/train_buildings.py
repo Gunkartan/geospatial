@@ -11,10 +11,30 @@ if __name__ == '__main__':
         exist_ok=True
     )
     df = pd.read_csv('../datasets/preprocessed_buildings.csv')
-    x = df.drop(columns=[
-        'labels',
-        'building'
-    ])
+    building_features = [
+        'ndvi',
+        'ndwi_mean',
+        'ndwi_variance',
+        'evi_mean',
+        'ndbi_mean',
+        'mndwi_mean',
+        'mndwi_variance',
+        'ndti',
+        'ndti_mean',
+        'ndbsi_mean',
+        'ndbsi_variance',
+        'bi',
+        'bi_mean',
+        'bi_variance',
+        'rbc_mean',
+        'grri_mean',
+        'grri_variance',
+        'rsr_mean',
+        'rsr_variance',
+        'rgri_mean',
+        'snr_variance'
+    ]
+    x = df[building_features]
     y = df['building']
     x_train, x_temp, y_train, y_temp = train_test_split(
         x,

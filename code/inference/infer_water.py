@@ -10,60 +10,49 @@ def infer_water(year: int) -> None:
     building_model = xgb.XGBClassifier()
     building_model.load_model('../models/buildings.json')
     water_features = [
+        'ndwi_mean',
+        'mndwi_mean',
+        'bsi_variance',
+        'ndti_mean',
+        'ndbsi_variance',
+        'bi',
+        'bi_mean',
+        'bi_variance',
+        'rbc_mean',
+        'rsr_mean',
+        'rsr_variance',
+        'rgri_mean',
+        'snr_mean',
+        'snr_variance'
+    ]
+    building_features = [
         'ndvi',
-        'ndvi_mean',
-        'ndvi_variance',
-        'ndwi',
         'ndwi_mean',
         'ndwi_variance',
-        'evi',
         'evi_mean',
-        'evi_variance',
-        'ndbi',
         'ndbi_mean',
-        'ndbi_variance',
-        'mndwi',
         'mndwi_mean',
         'mndwi_variance',
-        'bsi',
-        'bsi_mean',
-        'bsi_variance',
-        'ndsi',
-        'ndsi_mean',
-        'ndsi_variance',
         'ndti',
         'ndti_mean',
-        'ndti_variance',
-        'ndbsi',
         'ndbsi_mean',
         'ndbsi_variance',
         'bi',
         'bi_mean',
         'bi_variance',
-        'rbc',
         'rbc_mean',
-        'rbc_variance',
-        'grri',
         'grri_mean',
         'grri_variance',
-        'rsr',
         'rsr_mean',
         'rsr_variance',
-        'rgri',
         'rgri_mean',
-        'rgri_variance',
-        'snr',
-        'snr_mean',
-        'snr_variance',
-        'bri',
-        'bri_mean',
-        'bri_variance'
+        'snr_variance'
     ]
     water_probability = water_model.predict_proba(df[water_features])[
         :,
         1
     ]
-    building_probability = building_model.predict_proba(df[water_features])[
+    building_probability = building_model.predict_proba(df[building_features])[
         :,
         1
     ]

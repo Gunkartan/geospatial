@@ -11,10 +11,23 @@ if __name__ == '__main__':
         exist_ok=True
     )
     df = pd.read_csv('../datasets/preprocessed_water.csv')
-    x = df.drop(columns=[
-        'labels',
-        'water'
-    ])
+    water_features = [
+        'ndwi_mean',
+        'mndwi_mean',
+        'bsi_variance',
+        'ndti_mean',
+        'ndbsi_variance',
+        'bi',
+        'bi_mean',
+        'bi_variance',
+        'rbc_mean',
+        'rsr_mean',
+        'rsr_variance',
+        'rgri_mean',
+        'snr_mean',
+        'snr_variance'
+    ]
+    x = df[water_features]
     y = df['water']
     x_train, x_temp, y_train, y_temp = train_test_split(
         x,
