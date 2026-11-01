@@ -1,0 +1,40 @@
+WATER_FEATURES = [
+    'ndwi_mean',
+    'mndwi_mean',
+    'bsi_variance',
+    'ndti_mean',
+    'ndbsi_variance',
+    'bi',
+    'bi_mean',
+    'bi_variance',
+    'rbc_mean',
+    'rsr_mean',
+    'rsr_variance',
+    'rgri_mean',
+    'snr_mean',
+    'snr_variance'
+]
+BUILDING_FEATURES = [
+    'ndvi',
+    'ndwi_mean',
+    'ndwi_variance',
+    'evi_mean',
+    'ndbi_mean',
+    'mndwi_mean',
+    'mndwi_variance',
+    'ndti',
+    'ndti_mean',
+    'ndbsi_mean',
+    'ndbsi_variance',
+    'bi',
+    'bi_mean',
+    'bi_variance',
+    'rbc_mean',
+    'grri_mean',
+    'grri_variance',
+    'rsr_mean',
+    'rsr_variance',
+    'rgri_mean',
+    'snr_variance'
+]
+UPSTREAM_FEATURES = list(dict.fromkeys(WATER_FEATURES + BUILDING_FEATURES))

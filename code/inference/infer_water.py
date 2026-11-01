@@ -2,6 +2,7 @@ import sys
 import pandas as pd
 import xgboost as xgb
 from sklearn.metrics import precision_score, recall_score, f1_score
+from utils.features import WATER_FEATURES, BUILDING_FEATURES
 
 def infer_water(year: int) -> None:
     df = pd.read_csv(f'../datasets/preprocessed_water_final_pipeline_{year}.csv')
@@ -9,65 +10,15 @@ def infer_water(year: int) -> None:
     water_model.load_model('../models/water.json')
     building_model = xgb.XGBClassifier()
     building_model.load_model('../models/buildings.json')
-    water_features = [
-        'ndvi',
-        'ndvi_mean',
-        'ndvi_variance',
-        'ndwi',
-        'ndwi_mean',
-        'ndwi_variance',
-        'evi',
-        'evi_mean',
-        'evi_variance',
-        'ndbi',
-        'ndbi_mean',
-        'ndbi_variance',
-        'mndwi',
-        'mndwi_mean',
-        'mndwi_variance',
-        'bsi',
-        'bsi_mean',
-        'bsi_variance',
-        'ndsi',
-        'ndsi_mean',
-        'ndsi_variance',
-        'ndti',
-        'ndti_mean',
-        'ndti_variance',
-        'ndbsi',
-        'ndbsi_mean',
-        'ndbsi_variance',
-        'bi',
-        'bi_mean',
-        'bi_variance',
-        'rbc',
-        'rbc_mean',
-        'rbc_variance',
-        'grri',
-        'grri_mean',
-        'grri_variance',
-        'rsr',
-        'rsr_mean',
-        'rsr_variance',
-        'rgri',
-        'rgri_mean',
-        'rgri_variance',
-        'snr',
-        'snr_mean',
-        'snr_variance',
-        'bri',
-        'bri_mean',
-        'bri_variance'
-    ]
-    water_probability = water_model.predict_proba(df[water_features])[
+    water_probability = water_model.predict_proba(df[WATER_FEATURES])[
         :,
         1
     ]
-    building_probability = building_model.predict_proba(df[water_features])[
+    building_probability = building_model.predict_proba(df[BUILDING_FEATURES])[
         :,
         1
     ]
-    water_prediction = (water_probability >= 0.56).astype(int)
+    water_prediction = (water_probability >= 0.52).astype(int)
     water_true = df['class'].astype(str).str.startswith('4').astype(int)
     p_water = precision_score(
         water_true,

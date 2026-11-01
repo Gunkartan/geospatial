@@ -3,6 +3,7 @@ import rasterio
 import numpy as np
 import pandas as pd
 from utils.label_extractor import label_extractor
+from utils.features import BUILDING_FEATURES
 from scipy.ndimage import uniform_filter
 
 def compute_neighborhood_features(
@@ -28,25 +29,26 @@ def extract_raw_vals(
     index_dict: dict[
         str,
         np.ndarray
-    ]
+    ],
+    feature_names: list[str]
 ) -> np.ndarray:
     mask = aligned_overlap != 0
     raw_vals = aligned_overlap[mask].astype(int)
     labels = np.array([1 if str(val).startswith('1') else 0 for val in raw_vals])
-    features = [raw_vals]
+    all_features = {}
 
-    for _, arr in index_dict.items():
-        features.append(arr[mask])
+    for name, arr in index_dict.items():
         mean, var = compute_neighborhood_features(
             arr,
             3
         )
-        features.append(mean[mask])
-        features.append(var[mask])
+        all_features[name] = arr[mask]
+        all_features[f'{name}_mean'] = mean[mask]
+        all_features[f'{name}_variance'] = var[mask]
 
-    features = np.column_stack(features + [labels])
+    features = [raw_vals] + [all_features[name] for name in feature_names]
 
-    return features
+    return np.column_stack(features + [labels])
 
 def create_csv(
     features: np.ndarray,
@@ -128,12 +130,7 @@ if __name__ == '__main__':
     }
     block_size = 1024
     num_rows, num_cols = aligned_overlap.shape
-    columns = ['labels']
-
-    for name in index_dict.keys():
-        columns.extend([name, f'{name}_mean', f'{name}_variance'])
-
-    columns.append('building')
+    columns = ['labels'] + BUILDING_FEATURES + ['building']
 
     for row_start in range(
         0,
@@ -167,7 +164,8 @@ if __name__ == '__main__':
 
             feature_block = extract_raw_vals(
                 aligned_block,
-                index_block
+                index_block,
+                BUILDING_FEATURES
             )
             create_csv(
                 feature_block,
