@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import rasterio
 from utils.label_extractor import label_extractor
+from utils.features import UPSTREAM_FEATURES
 from extraction.extract_water import compute_neighborhood_features, process_water_features
 
 def create_csv(
@@ -51,20 +52,11 @@ def extract_water(year: int) -> None:
     water_features = process_water_features(sentinel_file)
     block_size = 1024
     num_rows, num_cols = next(iter(water_features.values())).shape
-    water_feature_names = []
-
-    for name in water_features.keys():
-        water_feature_names.extend([
-            name,
-            f'{name}_mean',
-            f'{name}_variance'
-        ])
-
     columns = [
         'row',
         'col',
         'class'
-    ] + water_feature_names
+    ] + UPSTREAM_FEATURES
     first_write = True
 
     for row_start in range(
