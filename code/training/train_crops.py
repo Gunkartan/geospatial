@@ -4,24 +4,16 @@ import joblib
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from sklearn.preprocessing import LabelEncoder
+from utils.features import CROP_FEATURES, PROBABILITY_FEATURES
 
 def train(standalone: bool) -> None:
     label_encoder_name = 'crop_label_encoder_standalone' if standalone else 'crop_label_encoder_pipeline'
     model_name = 'standalone_crops' if standalone else 'pipeline_crops'
-    probability_columns = [
-        'water_probability',
-        'building_probability'
-    ]
     df = pd.read_csv(f'../datasets/preprocessed_crops_final_pipeline_2018.csv')
-    x = df.drop(columns=[
-        'row',
-        'col',
-        'class',
-        *(probability_columns if standalone else [])
-    ])
+    x = df[CROP_FEATURES if standalone else CROP_FEATURES + PROBABILITY_FEATURES]
     y = df['class']
     le = LabelEncoder()
     y_encoded = le.fit_transform(y)
@@ -37,20 +29,28 @@ def train(standalone: bool) -> None:
         le,
         f'../label_encoders/{label_encoder_name}.joblib'
     )
-    x_train, x_temp, y_train, y_temp = train_test_split(
+    block_size = 256
+    blocks = (df['row'] // block_size).astype(str) + '_' + (df['col'] // block_size).astype(str)
+    folds = np.empty(
+        len(df),
+        dtype=int
+    )
+    splitter = StratifiedGroupKFold(
+        n_splits=5,
+        shuffle=True,
+        random_state=42
+    )
+
+    for fold, (_, fold_idx) in enumerate(splitter.split(
         x,
         y_encoded,
-        test_size=0.4,
-        random_state=42,
-        stratify=y_encoded
-    )
-    x_cv, x_test, y_cv, y_test = train_test_split(
-        x_temp,
-        y_temp,
-        test_size=0.5,
-        random_state=42,
-        stratify=y_temp
-    )
+        groups=blocks
+    )):
+        folds[fold_idx] = fold
+
+    x_train, y_train = x[folds >= 2], y_encoded[folds >= 2]
+    x_cv, y_cv = x[folds == 1], y_encoded[folds == 1]
+    x_test, y_test = x[folds == 0], y_encoded[folds == 0]
     model = xgb.XGBClassifier(
         n_estimators=800,
         learning_rate=0.1,

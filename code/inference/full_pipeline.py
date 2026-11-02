@@ -25,5 +25,5 @@ if __name__ == '__main__':
     )
     infer_crops(
         year,
-        True
+        False
     )

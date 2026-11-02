@@ -4,8 +4,67 @@ import rasterio
 import numpy as np
 import pandas as pd
 from utils.label_extractor import label_extractor
+from utils.features import PROBABILITY_FEATURES
 from extraction.extract_crops import process_sentinel
-from scipy.ndimage import binary_erosion
+from scipy.ndimage import binary_erosion, uniform_filter
+
+def compute_probability_features(
+    upstream_probabilities: pd.DataFrame,
+    shape: tuple[
+        int,
+        int
+    ]
+) -> dict[
+    str,
+    np.ndarray
+]:
+    rows = upstream_probabilities['row'].to_numpy()
+    cols = upstream_probabilities['col'].to_numpy()
+    probability_features = {}
+
+    for name in [
+        'water',
+        'building'
+    ]:
+        probability = np.full(
+            shape,
+            np.nan,
+            dtype='float32'
+        )
+        probability[
+            rows,
+            cols
+        ] = upstream_probabilities[f'{name}_probability'].to_numpy()
+        valid = ~np.isnan(probability)
+        total = uniform_filter(
+            np.where(
+                valid,
+                probability,
+                0
+            ).astype('float32'),
+            size=5,
+            mode='constant'
+        )
+        count = uniform_filter(
+            valid.astype('float32'),
+            size=5,
+            mode='constant'
+        )
+
+        with np.errstate(
+            divide='ignore',
+            invalid='ignore'
+        ):
+            mean = np.where(
+                count > 0,
+                total / count,
+                np.nan
+            ).astype('float32')
+
+        probability_features[f'{name}_probability'] = probability
+        probability_features[f'{name}_probability_mean_5'] = mean
+
+    return probability_features
 
 def extract_crops(
     year: int,
@@ -19,17 +78,6 @@ def extract_crops(
     dec_file = f'../raw/47PQQ_{year}-12-31.tif'
     upstream_probability_file = f'../datasets/upstream_probabilities_{year}.csv'
 
-    if remove_water_buildings:
-        upstream_probabilities = pd.read_csv(upstream_probability_file)
-        water_probability_map = upstream_probabilities.set_index([
-            'row',
-            'col'
-        ])['water_probability']
-        building_probability_map = upstream_probabilities.set_index([
-            'row',
-            'col'
-        ])['building_probability']
-
     with rasterio.open(label_file) as label:
         with rasterio.open(oct_file) as tile:
             tile_id = os.path.basename(oct_file).split('_')[0]
@@ -38,6 +86,12 @@ def extract_crops(
                 tile,
                 tile_id
             )
+
+    if remove_water_buildings:
+        probability_features = compute_probability_features(
+            pd.read_csv(upstream_probability_file),
+            aligned_overlap.shape
+        )
 
     oct_features = process_sentinel(oct_file)
     nov_features = process_sentinel(nov_file)
@@ -105,18 +159,11 @@ def extract_crops(
             }
 
             if remove_water_buildings:
-                coordinate = (
-                    row,
-                    col
-                )
-                data['water_probability'] = water_probability_map.get(
-                    coordinate,
-                    np.nan
-                )
-                data['building_probability'] = building_probability_map.get(
-                    coordinate,
-                    np.nan
-                )
+                for name, feature in probability_features.items():
+                    data[name] = feature[
+                        row,
+                        col
+                    ]
 
             for month, features in zip(
                 [
@@ -160,10 +207,7 @@ def extract_crops(
     ]
 
     if remove_water_buildings:
-        columns.extend([
-            'water_probability',
-            'building_probability'
-        ])
+        columns.extend(PROBABILITY_FEATURES)
 
     df = pd.DataFrame(
         dataset,

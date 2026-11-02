@@ -38,3 +38,26 @@ BUILDING_FEATURES = [
     'snr_variance'
 ]
 UPSTREAM_FEATURES = list(dict.fromkeys(WATER_FEATURES + BUILDING_FEATURES))
+CROP_FEATURES = [
+    'ndvi_oct',
+    'evi_oct',
+    'ndwi_oct',
+    'mtci_oct',
+    'swir_long_oct',
+    'ndvi_nov',
+    'evi_nov',
+    'ndwi_nov',
+    'mtci_nov',
+    'swir_long_nov',
+    'ndvi_dec',
+    'evi_dec',
+    'ndwi_dec',
+    'mtci_dec',
+    'swir_long_dec'
+]
+PROBABILITY_FEATURES = [
+    'water_probability',
+    'water_probability_mean_5',
+    'building_probability',
+    'building_probability_mean_5'
+]
