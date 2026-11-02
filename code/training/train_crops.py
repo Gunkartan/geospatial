@@ -64,7 +64,6 @@ def train(standalone: bool) -> None:
         x_train,
         y_train
     )
-    model.save_model(f'../models/{model_name}.json')
     y_cv_pred = model.predict(x_cv)
     class_map = {
         2101: 'rice',
@@ -105,6 +104,12 @@ def train(standalone: bool) -> None:
         y_cv_pred,
         average='weighted'
     ):.3f}')
+    final_model = xgb.XGBClassifier(**model.get_params())
+    final_model.fit(
+        x,
+        y_encoded
+    )
+    final_model.save_model(f'../models/{model_name}.json')
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
