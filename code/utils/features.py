@@ -38,3 +38,9 @@ BUILDING_FEATURES = [
     'snr_variance'
 ]
 UPSTREAM_FEATURES = list(dict.fromkeys(WATER_FEATURES + BUILDING_FEATURES))
+PROBABILITY_COLUMNS = [
+    'water_probability',
+    'water_probability_mean_5',
+    'building_probability',
+    'building_probability_mean_5'
+]

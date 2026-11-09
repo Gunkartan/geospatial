@@ -3,6 +3,7 @@ import joblib
 import pandas as pd
 import xgboost as xgb
 from sklearn.metrics import classification_report
+from utils.features import PROBABILITY_COLUMNS
 
 def infer_crops(
     year: int,
@@ -35,10 +36,7 @@ def infer_crops(
     ]
 
     if not standalone:
-        crop_features.extend([
-            'water_probability',
-            'building_probability'
-        ])
+        crop_features.extend(PROBABILITY_COLUMNS)
 
     crop_prediction = crop_model.predict(df[crop_features])
     crop_prediction = crop_label_encoder.inverse_transform(crop_prediction)

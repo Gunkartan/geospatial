@@ -5,7 +5,37 @@ import numpy as np
 import pandas as pd
 from utils.label_extractor import label_extractor
 from extraction.extract_crops import process_sentinel
+from extraction.extract_water import compute_neighborhood_features
+from utils.features import PROBABILITY_COLUMNS
 from scipy.ndimage import binary_erosion
+
+def upstream_probability_grids(
+    upstream_probability_file: str,
+    shape: tuple[int, int]
+) -> dict[str, np.ndarray]:
+    upstream_probabilities = pd.read_csv(upstream_probability_file)
+    rows = upstream_probabilities['row'].to_numpy()
+    cols = upstream_probabilities['col'].to_numpy()
+    grids = {}
+
+    for name in [
+        'water_probability',
+        'building_probability'
+    ]:
+        grid = np.full(
+            shape,
+            np.nan,
+            dtype='float32'
+        )
+        grid[rows, cols] = upstream_probabilities[name].to_numpy()
+        mean, _ = compute_neighborhood_features(
+            grid,
+            5
+        )
+        grids[name] = grid
+        grids[f'{name}_mean_5'] = mean
+
+    return grids
 
 def extract_crops(
     year: int,
@@ -19,17 +49,6 @@ def extract_crops(
     dec_file = f'../raw/47PQQ_{year}-12-31.tif'
     upstream_probability_file = f'../datasets/upstream_probabilities_{year}.csv'
 
-    if remove_water_buildings:
-        upstream_probabilities = pd.read_csv(upstream_probability_file)
-        water_probability_map = upstream_probabilities.set_index([
-            'row',
-            'col'
-        ])['water_probability']
-        building_probability_map = upstream_probabilities.set_index([
-            'row',
-            'col'
-        ])['building_probability']
-
     with rasterio.open(label_file) as label:
         with rasterio.open(oct_file) as tile:
             tile_id = os.path.basename(oct_file).split('_')[0]
@@ -38,6 +57,12 @@ def extract_crops(
                 tile,
                 tile_id
             )
+
+    if remove_water_buildings:
+        probability_grids = upstream_probability_grids(
+            upstream_probability_file,
+            aligned_overlap.shape
+        )
 
     oct_features = process_sentinel(oct_file)
     nov_features = process_sentinel(nov_file)
@@ -105,18 +130,11 @@ def extract_crops(
             }
 
             if remove_water_buildings:
-                coordinate = (
-                    row,
-                    col
-                )
-                data['water_probability'] = water_probability_map.get(
-                    coordinate,
-                    np.nan
-                )
-                data['building_probability'] = building_probability_map.get(
-                    coordinate,
-                    np.nan
-                )
+                for name, grid in probability_grids.items():
+                    data[name] = grid[
+                        row,
+                        col
+                    ]
 
             for month, features in zip(
                 [
@@ -160,10 +178,7 @@ def extract_crops(
     ]
 
     if remove_water_buildings:
-        columns.extend([
-            'water_probability',
-            'building_probability'
-        ])
+        columns.extend(PROBABILITY_COLUMNS)
 
     df = pd.DataFrame(
         dataset,

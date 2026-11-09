@@ -7,6 +7,7 @@ import xgboost as xgb
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from sklearn.preprocessing import LabelEncoder
+from utils.features import PROBABILITY_COLUMNS
 
 # 1000 px = 10 km at Sentinel-2 10 m resolution. Pixels from the same parcel
 # must never land on both sides of a split, or validation measures memorization.
@@ -36,16 +37,12 @@ def spatial_split(
 def train(standalone: bool) -> None:
     label_encoder_name = 'crop_label_encoder_standalone' if standalone else 'crop_label_encoder_pipeline'
     model_name = 'standalone_crops' if standalone else 'pipeline_crops'
-    probability_columns = [
-        'water_probability',
-        'building_probability'
-    ]
     df = pd.read_csv(f'../datasets/preprocessed_crops_final_pipeline_2018.csv')
     x = df.drop(columns=[
         'row',
         'col',
         'class',
-        *(probability_columns if standalone else [])
+        *(PROBABILITY_COLUMNS if standalone else [])
     ])
     y = df['class']
     le = LabelEncoder()
