@@ -78,21 +78,32 @@ def train(standalone: bool) -> None:
     x_test, y_test = x.iloc[test_idx], y_encoded[test_idx]
     print(f'Spatial split: {len(train_idx)} train / {len(cv_idx)} CV / {len(test_idx)} test pixels, '
           f'{len(np.unique(groups[train_idx]))}/{len(np.unique(groups[cv_idx]))}/{len(np.unique(groups[test_idx]))} blocks')
+    # Depth sweeps under the spatial split scored the same at depth 2-10 once the
+    # tree count was early-stopped on the CV blocks; deeper, unstopped models only
+    # memorize 2018 parcels. CV picks the tree count, so report on test blocks.
     model = xgb.XGBClassifier(
         n_estimators=800,
         learning_rate=0.1,
-        max_depth=10,
+        max_depth=6,
         subsample=0.6,
         colsample_bytree=0.8,
         random_state=42,
-        n_jobs=-1
+        n_jobs=-1,
+        early_stopping_rounds=30,
+        eval_metric='mlogloss'
     )
     model.fit(
         x_train,
-        y_train
+        y_train,
+        eval_set=[(
+            x_cv,
+            y_cv
+        )],
+        verbose=False
     )
+    print(f'Early stopping kept {model.best_iteration + 1} trees')
     model.save_model(f'../models/{model_name}.json')
-    y_cv_pred = model.predict(x_cv)
+    y_test_pred = model.predict(x_test)
     class_map = {
         2101: 'rice',
         2204: 'cassava',
@@ -111,25 +122,25 @@ def train(standalone: bool) -> None:
     }
     class_names = [class_map[class_id] for class_id in le.classes_]
     print(classification_report(
-        y_cv,
-        y_cv_pred,
+        y_test,
+        y_test_pred,
         labels=np.arange(len(le.classes_)),
         target_names=class_names,
         zero_division=0
     ))
     print(f'The precision is {precision_score(
-        y_cv,
-        y_cv_pred,
+        y_test,
+        y_test_pred,
         average='weighted'
     ):.3f}')
     print(f'The recall is {recall_score(
-        y_cv,
-        y_cv_pred,
+        y_test,
+        y_test_pred,
         average='weighted'
     ):.3f}')
     print(f'The F1 score is {f1_score(
-        y_cv,
-        y_cv_pred,
+        y_test,
+        y_test_pred,
         average='weighted'
     ):.3f}')
 
