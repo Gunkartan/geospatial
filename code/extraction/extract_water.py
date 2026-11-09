@@ -13,19 +13,46 @@ def compute_neighborhood_features(
     np.ndarray,
     np.ndarray
 ]:
-    mean = uniform_filter(
+    # uniform_filter keeps a running sum, so a single NaN/inf (e.g. a 0/0 ratio on
+    # a nodata pixel) would poison every value after it along the line. Average
+    # only the finite neighbours instead; float64 avoids cancellation in var.
+    valid = np.isfinite(arr)
+    filled = np.where(
+        valid,
         arr,
+        0
+    ).astype('float64')
+    weight = uniform_filter(
+        valid.astype('float64'),
         size=size,
         mode='reflect'
     )
-    mean_square = uniform_filter(
-        arr ** 2,
+    total = uniform_filter(
+        filled,
         size=size,
         mode='reflect'
     )
-    var = mean_square - mean ** 2
+    total_square = uniform_filter(
+        filled ** 2,
+        size=size,
+        mode='reflect'
+    )
 
-    return mean, var
+    with np.errstate(
+        invalid='ignore',
+        divide='ignore'
+    ):
+        mean = np.where(
+            weight > 0,
+            total / weight,
+            np.nan
+        )
+        var = np.maximum(
+            total_square / weight - mean ** 2,
+            0
+        )
+
+    return mean.astype('float32'), var.astype('float32')
 
 def extract_raw_vals(
     aligned_overlap: np.ndarray,

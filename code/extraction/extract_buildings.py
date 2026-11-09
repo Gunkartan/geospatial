@@ -4,25 +4,7 @@ import numpy as np
 import pandas as pd
 from utils.label_extractor import label_extractor
 from utils.features import BUILDING_FEATURES
-from scipy.ndimage import uniform_filter
-
-def compute_neighborhood_features(
-    arr: np.ndarray,
-    size: int
-) -> tuple[np.ndarray, np.ndarray]:
-    mean = uniform_filter(
-        arr,
-        size=size,
-        mode='reflect'
-    )
-    mean_square = uniform_filter(
-        arr ** 2,
-        size=size,
-        mode='reflect'
-    )
-    var = mean_square - mean ** 2
-
-    return mean, var
+from extraction.extract_water import compute_neighborhood_features
 
 def extract_raw_vals(
     aligned_overlap: np.ndarray,
