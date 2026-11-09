@@ -4,9 +4,34 @@ import joblib
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from sklearn.preprocessing import LabelEncoder
+
+# 1000 px = 10 km at Sentinel-2 10 m resolution. Pixels from the same parcel
+# must never land on both sides of a split, or validation measures memorization.
+BLOCK_SIZE = 1000
+
+def spatial_blocks(df: pd.DataFrame) -> np.ndarray:
+    return (df['row'].to_numpy() // BLOCK_SIZE) * 100000 + df['col'].to_numpy() // BLOCK_SIZE
+
+def spatial_split(
+    y: np.ndarray,
+    groups: np.ndarray,
+    n_splits: int
+) -> tuple[np.ndarray, np.ndarray]:
+    splitter = StratifiedGroupKFold(
+        n_splits=n_splits,
+        shuffle=True,
+        random_state=42
+    )
+    train_idx, holdout_idx = next(splitter.split(
+        np.zeros(len(y)),
+        y,
+        groups
+    ))
+
+    return train_idx, holdout_idx
 
 def train(standalone: bool) -> None:
     label_encoder_name = 'crop_label_encoder_standalone' if standalone else 'crop_label_encoder_pipeline'
@@ -37,20 +62,25 @@ def train(standalone: bool) -> None:
         le,
         f'../label_encoders/{label_encoder_name}.joblib'
     )
-    x_train, x_temp, y_train, y_temp = train_test_split(
-        x,
+    groups = spatial_blocks(df)
+    # 1/5 of blocks held out for test, then 1/4 of the rest for CV: ~60/20/20.
+    rest_idx, test_idx = spatial_split(
         y_encoded,
-        test_size=0.4,
-        random_state=42,
-        stratify=y_encoded
+        groups,
+        5
     )
-    x_cv, x_test, y_cv, y_test = train_test_split(
-        x_temp,
-        y_temp,
-        test_size=0.5,
-        random_state=42,
-        stratify=y_temp
+    train_pos, cv_pos = spatial_split(
+        y_encoded[rest_idx],
+        groups[rest_idx],
+        4
     )
+    train_idx = rest_idx[train_pos]
+    cv_idx = rest_idx[cv_pos]
+    x_train, y_train = x.iloc[train_idx], y_encoded[train_idx]
+    x_cv, y_cv = x.iloc[cv_idx], y_encoded[cv_idx]
+    x_test, y_test = x.iloc[test_idx], y_encoded[test_idx]
+    print(f'Spatial split: {len(train_idx)} train / {len(cv_idx)} CV / {len(test_idx)} test pixels, '
+          f'{len(np.unique(groups[train_idx]))}/{len(np.unique(groups[cv_idx]))}/{len(np.unique(groups[test_idx]))} blocks')
     model = xgb.XGBClassifier(
         n_estimators=800,
         learning_rate=0.1,
