@@ -6,7 +6,14 @@ import pandas as pd
 from utils.label_extractor import label_extractor
 from extraction.extract_crops import process_sentinel
 from extraction.extract_water import compute_neighborhood_features
-from utils.features import PROBABILITY_COLUMNS
+from utils.features import (
+    CROP_INDICES,
+    CROP_MONTHS,
+    CROP_SPECTRAL_FEATURES,
+    CROP_TEXTURE_FEATURES,
+    PROBABILITY_COLUMNS,
+    TEXTURE_WINDOW
+)
 from scipy.ndimage import binary_erosion
 
 def upstream_probability_grids(
@@ -45,8 +52,6 @@ def extract_crops(
     output_name = f'raw_crops_final_pipeline_{year}' if remove_water_buildings else f'raw_crops_standalone_{year}'
     label_file = f'../rasterized/{year}.tif'
     oct_file = f'../raw/47PQQ_{year}-10-31.tif'
-    nov_file = f'../raw/47PQQ_{year}-11-30.tif'
-    dec_file = f'../raw/47PQQ_{year}-12-31.tif'
     upstream_probability_file = f'../datasets/upstream_probabilities_{year}.csv'
 
     with rasterio.open(label_file) as label:
@@ -64,21 +69,6 @@ def extract_crops(
             aligned_overlap.shape
         )
 
-    oct_features = process_sentinel(oct_file)
-    nov_features = process_sentinel(nov_file)
-    dec_features = process_sentinel(dec_file)
-    feature_sets = [
-        oct_features,
-        nov_features,
-        dec_features
-    ]
-    feature_names = [
-        'ndvi',
-        'evi',
-        'ndwi',
-        'mtci',
-        'swir_long'
-    ]
     class_map = {
         2101: 'rice',
         2204: 'cassava',
@@ -94,7 +84,9 @@ def extract_crops(
         2419: 'mangosteen',
         2420: 'longkong'
     }
-    dataset = []
+    sampled_rows = []
+    sampled_cols = []
+    sampled_classes = []
     other_class_ids = np.unique(aligned_overlap)
     other_class_ids = [int(class_id) for class_id in other_class_ids if class_id != 0 and class_id not in class_map]
     rng = np.random.default_rng(42)
@@ -120,68 +112,53 @@ def extract_crops(
             rows = rows[selected]
             cols = cols[selected]
 
-        for row, col in zip(
-            rows,
-            cols
+        sampled_rows.append(rows)
+        sampled_cols.append(cols)
+        sampled_classes.append(np.full(
+            len(rows),
+            class_id if class_id in class_map else 9999
+        ))
+
+    rows = np.concatenate(sampled_rows)
+    cols = np.concatenate(sampled_cols)
+    data = {
+        'row': rows,
+        'col': cols,
+        'class': np.concatenate(sampled_classes)
+    }
+
+    # One month at a time, so only that month's full-size index arrays are in memory.
+    for month, date in CROP_MONTHS.items():
+        indices = process_sentinel(f'../raw/47PQQ_{year}-{date}.tif')
+
+        for name, index in zip(
+            CROP_INDICES,
+            indices
         ):
-            data = {
-                'row': row,
-                'col': col
-            }
+            mean, variance = compute_neighborhood_features(
+                index,
+                TEXTURE_WINDOW
+            )
+            data[f'{name}_{month}'] = index[rows, cols]
+            data[f'{name}_{month}_mean_{TEXTURE_WINDOW}'] = mean[rows, cols]
+            data[f'{name}_{month}_var_{TEXTURE_WINDOW}'] = variance[rows, cols]
 
-            if remove_water_buildings:
-                for name, grid in probability_grids.items():
-                    data[name] = grid[
-                        row,
-                        col
-                    ]
+        del indices
 
-            for month, features in zip(
-                [
-                    'oct',
-                    'nov',
-                    'dec'
-                ],
-                feature_sets
-            ):
-                for name, feature in zip(
-                    feature_names,
-                    features
-                ):
-                    data[f'{name}_{month}'] = feature[
-                        row,
-                        col
-                    ]
-
-            data['class'] = class_id if class_id in class_map else 9999
-            dataset.append(data)
+    if remove_water_buildings:
+        for name, grid in probability_grids.items():
+            data[name] = grid[rows, cols]
 
     columns = [
         'row',
         'col',
         'class',
-        'ndvi_oct',
-        'evi_oct',
-        'ndwi_oct',
-        'mtci_oct',
-        'swir_long_oct',
-        'ndvi_nov',
-        'evi_nov',
-        'ndwi_nov',
-        'mtci_nov',
-        'swir_long_nov',
-        'ndvi_dec',
-        'evi_dec',
-        'ndwi_dec',
-        'mtci_dec',
-        'swir_long_dec'
+        *CROP_SPECTRAL_FEATURES,
+        *CROP_TEXTURE_FEATURES,
+        *(PROBABILITY_COLUMNS if remove_water_buildings else [])
     ]
-
-    if remove_water_buildings:
-        columns.extend(PROBABILITY_COLUMNS)
-
     df = pd.DataFrame(
-        dataset,
+        data,
         columns=columns
     )
     df.to_csv(

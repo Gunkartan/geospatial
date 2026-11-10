@@ -3,7 +3,7 @@ import joblib
 import pandas as pd
 import xgboost as xgb
 from sklearn.metrics import classification_report
-from utils.features import PROBABILITY_COLUMNS
+from utils.features import CROP_SPECTRAL_FEATURES, CROP_TEXTURE_FEATURES, PROBABILITY_COLUMNS
 
 def infer_crops(
     year: int,
@@ -18,25 +18,10 @@ def infer_crops(
     crop_model.load_model(f'../models/{model_name}.json')
     crop_label_encoder = joblib.load(f'../label_encoders/{label_encoder_name}.joblib')
     crop_features = [
-        'ndvi_oct',
-        'evi_oct',
-        'ndwi_oct',
-        'mtci_oct',
-        'swir_long_oct',
-        'ndvi_nov',
-        'evi_nov',
-        'ndwi_nov',
-        'mtci_nov',
-        'swir_long_nov',
-        'ndvi_dec',
-        'evi_dec',
-        'ndwi_dec',
-        'mtci_dec',
-        'swir_long_dec'
+        *CROP_SPECTRAL_FEATURES,
+        *CROP_TEXTURE_FEATURES,
+        *([] if standalone else PROBABILITY_COLUMNS)
     ]
-
-    if not standalone:
-        crop_features.extend(PROBABILITY_COLUMNS)
 
     crop_prediction = crop_model.predict(df[crop_features])
     crop_prediction = crop_label_encoder.inverse_transform(crop_prediction)
