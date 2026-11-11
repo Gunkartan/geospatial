@@ -4,35 +4,11 @@ import joblib
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from sklearn.preprocessing import LabelEncoder
 from utils.features import PROBABILITY_COLUMNS
-
-# 1000 px = 10 km at Sentinel-2 10 m resolution. Pixels from the same parcel
-# must never land on both sides of a split, or validation measures memorization.
-BLOCK_SIZE = 1000
-
-def spatial_blocks(df: pd.DataFrame) -> np.ndarray:
-    return (df['row'].to_numpy() // BLOCK_SIZE) * 100000 + df['col'].to_numpy() // BLOCK_SIZE
-
-def spatial_split(
-    y: np.ndarray,
-    groups: np.ndarray,
-    n_splits: int
-) -> tuple[np.ndarray, np.ndarray]:
-    splitter = StratifiedGroupKFold(
-        n_splits=n_splits,
-        shuffle=True,
-        random_state=42
-    )
-    train_idx, holdout_idx = next(splitter.split(
-        np.zeros(len(y)),
-        y,
-        groups
-    ))
-
-    return train_idx, holdout_idx
+from utils.spatial import spatial_blocks, spatial_split
+from utils.dropout import blank_october
 
 def train(standalone: bool) -> None:
     label_encoder_name = 'crop_label_encoder_standalone' if standalone else 'crop_label_encoder_pipeline'
@@ -73,8 +49,11 @@ def train(standalone: bool) -> None:
     )
     train_idx = rest_idx[train_pos]
     cv_idx = rest_idx[cv_pos]
-    x_train, y_train = x.iloc[train_idx], y_encoded[train_idx]
-    x_cv, y_cv = x.iloc[cv_idx], y_encoded[cv_idx]
+    # October is blanked for a random share of train and CV rows, so the model learns
+    # a Nov/Dec fallback for pixels whose October scene is missing (half of 2020).
+    rng = np.random.default_rng(42)
+    x_train, y_train = blank_october(x.iloc[train_idx], rng), y_encoded[train_idx]
+    x_cv, y_cv = blank_october(x.iloc[cv_idx], rng), y_encoded[cv_idx]
     x_test, y_test = x.iloc[test_idx], y_encoded[test_idx]
     print(f'Spatial split: {len(train_idx)} train / {len(cv_idx)} CV / {len(test_idx)} test pixels, '
           f'{len(np.unique(groups[train_idx]))}/{len(np.unique(groups[cv_idx]))}/{len(np.unique(groups[test_idx]))} blocks')

@@ -4,129 +4,107 @@ import numpy as np
 import pandas as pd
 import rasterio
 from utils.label_extractor import label_extractor
-from utils.features import UPSTREAM_FEATURES
+from utils.features import CROP_MONTHS, UPSTREAM_FEATURES, UPSTREAM_MONTHLY_FEATURES
 from extraction.extract_water import compute_neighborhood_features, process_water_features
 
-def create_csv(
-    features: dict[
-        str,
-        np.ndarray
-    ],
-    columns: list[str],
-    year: int,
-    first_write: bool
-) -> None:
-    df = pd.DataFrame(
-        features,
-        columns=columns
-    )
-    df = df.round(3)
+CHUNK_SIZE = 2_000_000
 
-    if first_write:
-        df.to_csv(
-            f'../datasets/raw_water_final_pipeline_{year}.csv',
-            index=False
-        )
+def split_feature(feature: str) -> tuple[
+    str,
+    str
+]:
+    for suffix in (
+        '_variance',
+        '_mean'
+    ):
+        if feature.endswith(suffix):
+            return feature[:-len(suffix)], suffix
 
-    else:
-        df.to_csv(
-            f'../datasets/raw_water_final_pipeline_{year}.csv',
-            mode='a',
-            header=False,
-            index=False
-        )
+    return feature, ''
 
 def extract_water(year: int) -> None:
+    """Upstream features (UPSTREAM_FEATURES for Oct, Nov and Dec) for every labelled pixel.
+
+    The 3x3 neighbourhood mean and variance are computed over the whole tile, so
+    there are no edge effects at block borders.
+    """
     label_file = f'../rasterized/{year}.tif'
-    sentinel_file = f'../raw/47PQQ_{year}-10-31.tif'
+    oct_file = f'../raw/47PQQ_{year}-10-31.tif'
 
     with rasterio.open(label_file) as label:
-        with rasterio.open(sentinel_file) as tile:
-            tile_id = os.path.basename(sentinel_file).split('_')[0]
+        with rasterio.open(oct_file) as tile:
+            tile_id = os.path.basename(oct_file).split('_')[0]
             aligned_overlap = label_extractor(
                 label,
                 tile,
                 tile_id
             )
 
-    water_features = process_water_features(sentinel_file)
-    block_size = 1024
-    num_rows, num_cols = next(iter(water_features.values())).shape
-    columns = [
-        'row',
-        'col',
-        'class'
-    ] + UPSTREAM_FEATURES
-    first_write = True
+    rows, cols = np.where(aligned_overlap != 0)
+    classes = aligned_overlap[rows, cols]
+    del aligned_overlap
+    needed = {}
 
-    for row_start in range(
-        0,
-        num_rows,
-        block_size
-    ):
-        for col_start in range(
-            0,
-            num_cols,
-            block_size
-        ):
-            row_end = min(
-                row_start + block_size,
-                num_rows
-            )
-            col_end = min(
-                col_start + block_size,
-                num_cols
-            )
-            label_block = aligned_overlap[
-                row_start:row_end,
-                col_start:col_end
-            ]
-            mask = label_block != 0
-            local_rows, local_cols = np.where(mask)
+    for feature in UPSTREAM_FEATURES:
+        base, suffix = split_feature(feature)
+        needed.setdefault(base, set()).add(suffix)
 
-            if len(local_rows) == 0:
-                continue
+    column = {name: i for i, name in enumerate(UPSTREAM_MONTHLY_FEATURES)}
+    features = np.empty(
+        (
+            len(rows),
+            len(UPSTREAM_MONTHLY_FEATURES)
+        ),
+        dtype='float32'
+    )
 
-            rows = local_rows + row_start
-            cols = local_cols + col_start
-            data = {
-                'row': rows,
-                'col': cols,
-                'class': label_block[
-                    local_rows,
-                    local_cols
-                ]
-            }
+    for month, date in CROP_MONTHS.items():
+        indices = process_water_features(f'../raw/{tile_id}_{year}-{date}.tif')
 
-            for name, arr in water_features.items():
-                block = arr[
-                    row_start:row_end,
-                    col_start:col_end
-                ]
+        for base, suffixes in needed.items():
+            arr = indices.pop(base)
+            values = {'': arr[rows, cols]}
+
+            if suffixes - {''}:
                 mean, variance = compute_neighborhood_features(
-                    block,
+                    arr,
                     3
                 )
-                data[name] = block[
-                    local_rows,
-                    local_cols
-                ]
-                data[f'{name}_mean'] = mean[
-                    local_rows,
-                    local_cols
-                ]
-                data[f'{name}_variance'] = variance[
-                    local_rows,
-                    local_cols
-                ]
+                values['_mean'] = mean[rows, cols]
+                values['_variance'] = variance[rows, cols]
+                del mean, variance
 
-            create_csv(
-                data,
-                columns,
-                year,
-                first_write
-            )
-            first_write = False
+            for suffix in suffixes:
+                value = values[suffix]
+                value[~np.isfinite(value)] = np.nan
+                features[:, column[f'{base}{suffix}_{month}']] = value
+
+            del arr, values
+
+        del indices
+        print(f'{year} {month} features done', flush=True)
+
+    output_file = f'../datasets/raw_water_final_pipeline_{year}.csv'
+
+    for start in range(
+        0,
+        len(rows),
+        CHUNK_SIZE
+    ):
+        end = start + CHUNK_SIZE
+        df = pd.DataFrame(
+            features[start:end],
+            columns=UPSTREAM_MONTHLY_FEATURES
+        ).round(3)
+        df.insert(0, 'class', classes[start:end])
+        df.insert(0, 'col', cols[start:end])
+        df.insert(0, 'row', rows[start:end])
+        df.to_csv(
+            output_file,
+            mode='w' if start == 0 else 'a',
+            header=start == 0,
+            index=False
+        )
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:

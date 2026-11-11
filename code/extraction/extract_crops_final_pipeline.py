@@ -11,8 +11,10 @@ from utils.features import (
     CROP_MONTHS,
     CROP_SPECTRAL_FEATURES,
     CROP_TEXTURE_FEATURES,
+    EXCLUDED_LABELS,
     PROBABILITY_COLUMNS,
-    TEXTURE_WINDOW
+    TEXTURE_WINDOW,
+    UPSTREAM_MODELS
 )
 from scipy.ndimage import binary_erosion
 
@@ -25,10 +27,7 @@ def upstream_probability_grids(
     cols = upstream_probabilities['col'].to_numpy()
     grids = {}
 
-    for name in [
-        'water_probability',
-        'building_probability'
-    ]:
+    for name in [f'{model}_probability' for model in UPSTREAM_MODELS]:
         grid = np.full(
             shape,
             np.nan,
@@ -88,7 +87,10 @@ def extract_crops(
     sampled_cols = []
     sampled_classes = []
     other_class_ids = np.unique(aligned_overlap)
-    other_class_ids = [int(class_id) for class_id in other_class_ids if class_id != 0 and class_id not in class_map]
+    other_class_ids = [
+        int(class_id) for class_id in other_class_ids
+        if class_id != 0 and class_id not in class_map and class_id not in EXCLUDED_LABELS
+    ]
     rng = np.random.default_rng(42)
 
     for class_id in [

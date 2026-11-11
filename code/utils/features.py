@@ -60,9 +60,41 @@ CROP_TEXTURE_FEATURES = [
     for index in CROP_INDICES
     for stat in ('mean', 'var')
 ]
+# Upstream land-use group models: probability column name -> (model file, features).
+# Each is a binary model for one LU_ID_L1 group (1 built-up, 3 forest, 4 water,
+# 5 miscellaneous); forest and misc target the non-crop land the crop model most
+# often calls crop.
+#
+# Every upstream model sees its features for October, November and December
+# (e.g. 'ndwi_mean_nov'). October alone is missing for 44% of 2020 pixels; adding
+# the later months raised 2020 water AP from 0.33 to 0.61 and building AP from 0.21 to 0.74.
+def monthly(features: list[str]) -> list[str]:
+    return [f'{feature}_{month}' for month in CROP_MONTHS for feature in features]
+
+UPSTREAM_MONTHLY_FEATURES = monthly(UPSTREAM_FEATURES)
+UPSTREAM_MODELS = {
+    'water': ('water', monthly(WATER_FEATURES)),
+    'building': ('buildings', monthly(BUILDING_FEATURES)),
+    'forest': ('forest', UPSTREAM_MONTHLY_FEATURES),
+    'misc': ('misc', UPSTREAM_MONTHLY_FEATURES)
+}
 PROBABILITY_COLUMNS = [
-    'water_probability',
-    'water_probability_mean_5',
-    'building_probability',
-    'building_probability_mean_5'
+    f'{name}_probability{suffix}'
+    for name in UPSTREAM_MODELS
+    for suffix in ('', '_mean_5')
+]# Labels left out of crop training and scoring because their ground truth is ambiguous.
+# 32767: every mixed land-use polygon (e.g. 'A403/A419' Durian/Mangosteen). Their joined
+# LU_ID_L3 codes (e.g. 240312419) overflow the int16 label raster and clip to 32767;
+# nearly all are mixtures that include a target crop.
+# The rest are crop-like 'other agriculture' classes that are neither a target crop nor
+# clearly non-crop: mixed orchard, mixed perennial and abandoned agricultural land.
+MIXED_LAND_USE_LABEL = 32767
+EXCLUDED_LABELS = [
+    MIXED_LAND_USE_LABEL,
+    2401,
+    2301,
+    2100,
+    2200,
+    2300,
+    2400
 ]

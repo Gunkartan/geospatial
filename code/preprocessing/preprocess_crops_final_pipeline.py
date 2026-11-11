@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import pandas as pd
+from utils.features import CROP_SPECTRAL_FEATURES
 
 def preprocess_crops(
     year: int,
@@ -16,7 +17,11 @@ def preprocess_crops(
         ],
         np.nan
     )
-    df = df.dropna().reset_index(drop=True)
+    # Rows with missing features are kept (October is missing for about half of 2020;
+    # the crop models are trained to fall back on Nov/Dec). Only rows with no
+    # spectral data in any month are dropped.
+    spectral = [column for column in CROP_SPECTRAL_FEATURES if column in df.columns]
+    df = df[df[spectral].notna().any(axis=1)].reset_index(drop=True)
     df.to_csv(
         f'../datasets/{output_name}.csv',
         index=False
